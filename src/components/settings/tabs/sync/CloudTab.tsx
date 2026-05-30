@@ -34,7 +34,7 @@ import { SettingsTab, wrapTab } from "@components/settings/tabs/BaseTab";
 import { Margins } from "@utils/margins";
 import { classes } from "@utils/misc";
 import { IconComponent } from "@utils/types";
-import { ConfirmModal,openModal, Select, Tooltip, useState } from "@webpack/common";
+import { ConfirmModal, openModal, Select, Tooltip, useState } from "@webpack/common";
 
 function validateUrl(url: string) {
     try {
@@ -135,7 +135,7 @@ function SettingsSyncSection() {
                 <FormSwitch
                     key="cloud-sync"
                     title="Enable Settings Sync"
-                    description="Save your Vencord settings to the cloud so you can easily keep them the same on all your devices"
+                    description="Save your Nikcord settings to the cloud so you can easily keep them the same on all your devices"
                     value={cloud.settingsSync}
                     onChange={v => { cloud.settingsSync = v; }}
                     disabled={!cloud.authenticated}

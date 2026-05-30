@@ -1,21 +1,3 @@
-/*
- * Vencord, a modification for Discord's desktop app
- * Copyright (c) 2022 Vendicated and contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
-*/
-
 import "./styles.css";
 
 import * as DataStore from "@api/DataStore";
@@ -35,39 +17,38 @@ import { Margins } from "@utils/margins";
 import { classes } from "@utils/misc";
 import { useAwaiter, useCleanupEffect } from "@utils/react";
 import { PluginTag, PluginTags } from "@utils/types";
-import { Button, ConfirmModal,lodash, openModal, Parser, React, SearchableSelect, Select, TextInput, Tooltip, useMemo, useRef, useState } from "@webpack/common";
+import { Button, ConfirmModal, lodash, openModal, Parser, React, SearchableSelect, Select, TextInput, Tooltip, useMemo, useRef, useState } from "@webpack/common";
 import { JSX } from "react";
 
 import Plugins, { ExcludedPlugins, PluginMeta } from "~plugins";
-
 import { PluginCard } from "./PluginCard";
 import { UIElementsButton } from "./UIElements";
 
 export const cl = classNameFactory("vc-plugins-");
 export const logger = new Logger("PluginSettings", "#a6d189");
 
-function ReloadRequiredCard({ required }: { required: boolean; }) {
+function ReloadRequiredCard({ required, count, nikcordCount }: { required: boolean; count: number; nikcordCount: number; }) {
     return (
         <Card variant={required ? "warning" : "normal"} className={cl("info-card")}>
             {required
-                ? (
-                    <>
-                        <HeadingTertiary>Restart required!</HeadingTertiary>
-                        <Paragraph className={cl("dep-text")}>
-                            Restart now to apply new plugins and their settings
-                        </Paragraph>
-                        <Button onClick={() => location.reload()} className={cl("restart-button")}>
-                            Restart
-                        </Button>
-                    </>
-                )
-                : (
-                    <>
-                        <HeadingTertiary>Plugin Management</HeadingTertiary>
-                        <Paragraph>Press the cog wheel or info icon to get more info on a plugin</Paragraph>
-                        <Paragraph>Plugins with a cog wheel have settings you can modify!</Paragraph>
-                    </>
-                )}
+                ? <>
+                    <HeadingTertiary>Restart required!</HeadingTertiary>
+                    <Paragraph className={cl("dep-text")}>
+                        Restart now to apply new plugins and their settings
+                    </Paragraph>
+                    <Button onClick={() => location.reload()} className={cl("restart-button")}>
+                        Restart
+                    </Button>
+                </>
+                : <>
+                    <HeadingTertiary>Plugin Management</HeadingTertiary>
+                    <Paragraph>Press the cog wheel or info icon to get more info on a plugin</Paragraph>
+                    <Paragraph>Plugins with a cog wheel have settings you can modify!</Paragraph>
+                    <Paragraph style={{ marginTop: "8px", opacity: 0.6, fontSize: "13px" }}>
+                        {count} plugins installed &bull; {nikcordCount} Nikcord plugins
+                    </Paragraph>
+                </>
+            }
         </Card>
     );
 }
@@ -78,16 +59,16 @@ const enum SearchStatus {
     DISABLED,
     NEW,
     USER_PLUGINS,
-    API_PLUGINS
+    API_PLUGINS,
+    NIKCORD_PLUGINS
 }
 
 function ExcludedPluginsList({ search }: { search: string; }) {
     const matchingExcludedPlugins = search
-        ? Object.entries(ExcludedPlugins)
-            .filter(([name]) => name.toLowerCase().includes(search))
+        ? Object.entries(ExcludedPlugins).filter(([name]) => name.toLowerCase().includes(search))
         : [];
 
-    const ExcludedReasons: Record<"web" | "discordDesktop" | "vesktop" | "desktop" | "dev", string> = {
+    const ExcludedReasons: Record<string, string> = {
         desktop: "Discord Desktop app or Vesktop",
         discordDesktop: "Discord Desktop app",
         vesktop: "Vesktop app",
@@ -97,8 +78,8 @@ function ExcludedPluginsList({ search }: { search: string; }) {
 
     return (
         <Paragraph className={Margins.top16}>
-            {matchingExcludedPlugins.length
-                ? <>
+            {matchingExcludedPlugins.length ? (
+                <>
                     <Paragraph>Are you looking for:</Paragraph>
                     <ul>
                         {matchingExcludedPlugins.map(([name, reason]) => (
@@ -108,8 +89,9 @@ function ExcludedPluginsList({ search }: { search: string; }) {
                         ))}
                     </ul>
                 </>
-                : "No plugins meet the search criteria."
-            }
+            ) : (
+                "No plugins meet the search criteria."
+            )}
         </Paragraph>
     );
 }
@@ -144,7 +126,7 @@ function PluginSettings() {
     }, []);
 
     const depMap = useMemo(() => {
-        const o = {} as Record<string, string[]>;
+        const o: Record<string, string[]> = {};
         for (const plugin in Plugins) {
             const deps = Plugins[plugin].dependencies;
             if (deps) {
@@ -157,17 +139,32 @@ function PluginSettings() {
         return o;
     }, []);
 
-    const sortedPlugins = useMemo(() =>
-        Object.values(Plugins).sort((a, b) => a.name.localeCompare(b.name)),
+    const sortedPlugins = useMemo(
+        () => Object.values(Plugins).sort((a, b) => a.name.localeCompare(b.name)),
         []
     );
 
-    const hasUserPlugins = useMemo(() => !IS_STANDALONE && Object.values(PluginMeta).some(m => m.userPlugin), []);
+    const hasUserPlugins = useMemo(
+        () => !IS_STANDALONE && Object.values(PluginMeta).some(m => m.userPlugin),
+        []
+    );
 
-    const [searchValue, setSearchValue] = useState({ value: "", tags: [] as PluginTag[], status: SearchStatus.ALL });
+    const nikcordCount = useMemo(
+        () => Object.values(Plugins).filter(p =>
+            p.tags?.includes("Nikcord") ||
+            (PluginMeta as any)?.[p.name]?.nikcord === true ||
+            p.name.toLowerCase().includes("nikcord")
+        ).length,
+        []
+    );
+
+    const [searchValue, setSearchValue] = useState({
+        value: "",
+        tags: [] as PluginTag[],
+        status: SearchStatus.ALL
+    });
 
     const search = searchValue.value.toLowerCase();
-    const onSearch = (query: string) => setSearchValue(prev => ({ ...prev, value: query }));
 
     const pluginFilter = (plugin: typeof Plugins[keyof typeof Plugins]) => {
         const { status, tags } = searchValue;
@@ -188,6 +185,13 @@ function PluginSettings() {
             case SearchStatus.API_PLUGINS:
                 if (!plugin.name.endsWith("API")) return false;
                 break;
+            case SearchStatus.NIKCORD_PLUGINS:
+                const isNikcord =
+                    plugin.tags?.includes("Nikcord") ||
+                    (PluginMeta as any)?.[plugin.name]?.nikcord === true ||
+                    plugin.name.toLowerCase().includes("nikcord");
+                if (!isNikcord) return false;
+                break;
         }
 
         if (tags.length && tags.some(t => !plugin.tags?.includes(t))) return false;
@@ -196,56 +200,53 @@ function PluginSettings() {
 
         return (
             plugin.name.toLowerCase().includes(search) ||
-            plugin.name.match(/[A-Z]/g)?.join("").toLowerCase().includes(search) || // acronyms like BF for BetterFolders
+            plugin.name.match(/[A-Z]/g)?.join("").toLowerCase().includes(search) ||
             plugin.description.toLowerCase().includes(search) ||
             plugin.searchTerms?.some(t => t.toLowerCase().includes(search))
         );
     };
 
-    const [newPlugins] = useAwaiter(() => DataStore.get("Vencord_existingPlugins").then((cachedPlugins: Record<string, number> | undefined) => {
-        const now = Date.now() / 1000;
-        const existingTimestamps: Record<string, number> = {};
-        const sortedPluginNames = Object.values(sortedPlugins).map(plugin => plugin.name);
+    const [newPlugins] = useAwaiter(() =>
+        DataStore.get("Vencord_existingPlugins").then((cached: Record<string, number> | undefined) => {
+            const now = Date.now() / 1000;
+            const existing: Record<string, number> = {};
+            const sortedNames = Object.values(sortedPlugins).map(p => p.name);
+            const newPlugins: string[] = [];
 
-        const newPlugins: string[] = [];
-        for (const { name: p } of sortedPlugins) {
-            const time = existingTimestamps[p] = cachedPlugins?.[p] ?? now;
-            if ((time + 60 * 60 * 24 * 2) > now) {
-                newPlugins.push(p);
+            for (const { name: p } of sortedPlugins) {
+                const time = existing[p] = cached?.[p] ?? now;
+                if ((time + 60 * 60 * 24 * 2) > now) newPlugins.push(p);
             }
-        }
-        DataStore.set("Vencord_existingPlugins", existingTimestamps);
 
-        return lodash.isEqual(newPlugins, sortedPluginNames) ? [] : newPlugins;
-    }));
+            DataStore.set("Vencord_existingPlugins", existing);
+            return lodash.isEqual(newPlugins, sortedNames) ? [] : newPlugins;
+        })
+    );
 
-    const plugins = [] as JSX.Element[];
-    const requiredPlugins = [] as JSX.Element[];
+    const plugins: JSX.Element[] = [];
+    const requiredPlugins: JSX.Element[] = [];
 
     const showApi = searchValue.status === SearchStatus.API_PLUGINS;
-    for (const p of sortedPlugins) {
-        if (p.hidden || (!p.settings && p.name.endsWith("API") && !showApi))
-            continue;
 
+    for (const p of sortedPlugins) {
+        if (p.hidden || (!p.settings && p.name.endsWith("API") && !showApi)) continue;
         if (!pluginFilter(p)) continue;
 
-        const isRequired = p.required || p.isDependency || depMap[p.name]?.some(d => settings.plugins[d].enabled);
+        const isRequired =
+            p.required ||
+            p.isDependency ||
+            depMap[p.name]?.some(d => settings.plugins[d].enabled);
 
         if (isRequired) {
-            const tooltipText = p.required || !depMap[p.name]
-                ? "This plugin is required for Vencord to function."
-                : makeDependencyList(depMap[p.name]?.filter(d => settings.plugins[d].enabled));
-
             requiredPlugins.push(
-                <Tooltip text={tooltipText} key={p.name}>
-                    {({ onMouseLeave, onMouseEnter }) => (
+                <Tooltip text="Required plugin" key={p.name}>
+                    {({ onMouseEnter, onMouseLeave }) => (
                         <PluginCard
-                            onMouseLeave={onMouseLeave}
-                            onMouseEnter={onMouseEnter}
-                            onRestartNeeded={(name, key) => changes.handleChange(`${name}.${key}`)}
-                            disabled={true}
                             plugin={p}
-                            key={p.name}
+                            disabled
+                            onMouseEnter={onMouseEnter}
+                            onMouseLeave={onMouseLeave}
+                            onRestartNeeded={(name, key) => changes.handleChange(`${name}.${key}`)}
                         />
                     )}
                 </Tooltip>
@@ -253,11 +254,11 @@ function PluginSettings() {
         } else {
             plugins.push(
                 <PluginCard
-                    onRestartNeeded={(name, key) => changes.handleChange(`${name}.${key}`)}
-                    disabled={false}
-                    plugin={p}
-                    isNew={newPlugins?.includes(p.name)}
                     key={p.name}
+                    plugin={p}
+                    disabled={false}
+                    isNew={newPlugins?.includes(p.name)}
+                    onRestartNeeded={(name, key) => changes.handleChange(`${name}.${key}`)}
                 />
             );
         }
@@ -265,7 +266,7 @@ function PluginSettings() {
 
     return (
         <SettingsTab>
-            <ReloadRequiredCard required={changes.hasChanges} />
+            <ReloadRequiredCard required={changes.hasChanges} count={Object.values(Plugins).length} nikcordCount={nikcordCount} />
 
             <UIElementsButton />
 
@@ -273,64 +274,52 @@ function PluginSettings() {
                 Filters
             </HeadingTertiary>
 
-            <ErrorBoundary noop>
-                <TextInput
-                    inputClassName={cl("filter-control")}
-                    placeholder="Search for a plugin..."
-                    value={searchValue.value}
-                    onChange={onSearch}
-                    autoFocus
+            <TextInput
+                inputClassName={cl("filter-control")}
+                placeholder="Search for a plugin..."
+                value={searchValue.value}
+                onChange={v => setSearchValue(p => ({ ...p, value: v }))}
+                autoFocus
+            />
+
+            <div className={classes(Margins.bottom20, Margins.top8, cl("filter-controls"))}>
+                <Select
+                    options={[
+                        { label: "Show All", value: SearchStatus.ALL, default: true },
+                        { label: "Show Enabled", value: SearchStatus.ENABLED },
+                        { label: "Show Disabled", value: SearchStatus.DISABLED },
+                        { label: "Show New", value: SearchStatus.NEW },
+                        hasUserPlugins && { label: "Show UserPlugins", value: SearchStatus.USER_PLUGINS },
+                        { label: "Show API Plugins", value: SearchStatus.API_PLUGINS },
+                        { label: "Show Nikcord plugins (Extra)", value: SearchStatus.NIKCORD_PLUGINS }
+                    ].filter(isTruthy)}
+                    serialize={String}
+                    select={v => setSearchValue(p => ({ ...p, status: v }))}
+                    isSelected={v => v === searchValue.status}
+                    closeOnSelect
                 />
-            </ErrorBoundary>
 
-            <ErrorBoundary noop>
-                <div className={classes(Margins.bottom20, Margins.top8, cl("filter-controls"))}>
-                    <Select
-                        options={[
-                            { label: "Show All", value: SearchStatus.ALL, default: true },
-                            { label: "Show Enabled", value: SearchStatus.ENABLED },
-                            { label: "Show Disabled", value: SearchStatus.DISABLED },
-                            { label: "Show New", value: SearchStatus.NEW },
-                            hasUserPlugins && { label: "Show UserPlugins", value: SearchStatus.USER_PLUGINS },
-                            { label: "Show API Plugins", value: SearchStatus.API_PLUGINS },
-                        ].filter(isTruthy)}
-                        serialize={String}
-                        select={status => setSearchValue(prev => ({ ...prev, status }))}
-                        isSelected={v => v === searchValue.status}
-                        closeOnSelect={true}
-                        placeholder="Filter by Type"
-                    />
-                    <SearchableSelect
-                        options={PluginTags.map(tag => ({ label: tag, value: tag }))}
-                        value={searchValue.tags}
-                        onChange={tags => setSearchValue(prev => ({ ...prev, tags }))}
-                        closeOnSelect={false}
-                        placeholder="Filter by Tags"
-                        multi
-                    />
-                </div>
-            </ErrorBoundary>
+                <SearchableSelect
+                    options={PluginTags.map(tag => ({ label: tag, value: tag }))}
+                    value={searchValue.tags}
+                    onChange={tags => setSearchValue(p => ({ ...p, tags }))}
+                    closeOnSelect={false}
+                    multi
+                />
+            </div>
 
-            <HeadingTertiary className={Margins.top20}>Plugins</HeadingTertiary>
+            <HeadingTertiary>Plugins</HeadingTertiary>
 
-            {plugins.length || requiredPlugins.length
-                ? (
-                    <div className={cl("grid")}>
-                        {plugins.length
-                            ? plugins
-                            : <Paragraph>No plugins meet the search criteria.</Paragraph>
-                        }
-                    </div>
-                )
-                : <ExcludedPluginsList search={search} />
-            }
-
+            <div className={cl("grid")}>
+                {plugins.length
+                    ? plugins
+                    : <Paragraph>No plugins meet the search criteria.</Paragraph>
+                }
+            </div>
 
             <Divider className={Margins.top20} />
 
-            <HeadingTertiary className={classes(Margins.top20, Margins.bottom8)}>
-                Required Plugins
-            </HeadingTertiary>
+            <HeadingTertiary>Required Plugins</HeadingTertiary>
 
             <div className={cl("grid")}>
                 {requiredPlugins.length
@@ -338,16 +327,7 @@ function PluginSettings() {
                     : <Paragraph>No plugins meet the search criteria.</Paragraph>
                 }
             </div>
-        </SettingsTab >
-    );
-}
-
-function makeDependencyList(deps: string[]) {
-    return (
-        <>
-            <Paragraph>This plugin is required by:</Paragraph>
-            {deps.map((dep: string) => <Paragraph key={dep} className={cl("dep-text")}>{dep}</Paragraph>)}
-        </>
+        </SettingsTab>
     );
 }
 
