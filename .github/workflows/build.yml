@@ -45,7 +45,6 @@ jobs:
               run: |
                   rm -rf dist/*-unpacked dist/vendor Vencord.user.css vencordDesktopRenderer.css vencordDesktopRenderer.css.map
 
-            # This automatically takes everything inside the "dist" folder and pushes it to a clean 'build' branch on your repo
             - name: Deploy Build to GitHub Branches
               uses: JamesIves/github-pages-deploy-action@v4
               with:
