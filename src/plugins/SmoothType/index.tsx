@@ -197,10 +197,7 @@ export default definePlugin({
     name: "SmoothType",
     enabledByDefault: true,
     description: "The plugin allows you to fully customize the cursor caret's visual settings, including adjustable transition delays and custom CSS animation effects.",
-authors: [
-        { name: "Aurick", id: 1348025017233047634n },
-        { name: "appleflyer", id: 1209096766075703368n }
-    ],
+authors: [Devs.Aurick, Devs.appleflyer],
     tags: ["Nikcord"],
     settings,
 
